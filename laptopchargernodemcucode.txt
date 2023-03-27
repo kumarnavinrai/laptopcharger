@@ -1,0 +1,337 @@
+#include <EEPROM.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+
+const char* ssid = "navilappy";
+const char* password = "12345678";
+const int EEPROM_SIZE = 512;
+const int EEPROM_SIZE_TOCHECK = 507;
+char eepromData[6];
+int counter = 0;
+const int EEPROM_RESET_TIMER = 900;
+const int EEPROM_RESET_TIMER_NO_WIFI = 300;
+
+// define the GPIO pin that the relay is connected to
+#define RELAY_PIN_D0 D0
+#define RELAY_PIN_D1 D1
+#define RELAY_PIN_D2 D2
+#define RELAY_PIN_D5 D5
+#define RELAY_PIN_D6 D6
+#define RELAY_PIN_D3 D3
+#define RELAY_PIN_D8 D8
+#define RELAY_PIN_D7 D7
+#define RELAY_PIN_D4 D4
+
+//Variables
+int i = 0;
+int statusCode;
+String st;
+String content;
+
+ESP8266WebServer server(80);
+
+int flagAddress = 0;
+
+void handleRoot() {
+      IPAddress ip = WiFi.softAPIP();
+      String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) + '.' + String(ip[3]);
+      content = "<!DOCTYPE HTML>\r\n<html>Welcome to Wifi Credentials Update page";
+      content += "<form action=\"/scan\" method=\"POST\"><input type=\"submit\" value=\"scan\"></form>";
+      content += ipStr;
+      content += "<p>";
+      content += st;
+      content += "</p><form method='get' action='setting'><label>SSID: </label><input name='ssid' length=32><input name='pass' length=64><input type='submit'></form>";
+      content += "</html>";
+      server.send(200, "text/html", content);
+}
+
+void handleRestart() {
+  ESP.reset();
+  content = "<!DOCTYPE HTML>\r\n<html>Esp restarted!";
+  server.send(200, "text/html", content);
+}
+
+void handleSettings() {
+    String qsid = server.arg("ssid");
+    String qpass = server.arg("pass");
+    if (qsid.length() > 0 && qpass.length() > 0) {
+        Serial.println("clearing eeprom");
+        for (int i = 0; i < 96; ++i) {
+          EEPROM.write(i, 0);
+        }
+        Serial.println(qsid);
+        Serial.println("");
+        Serial.println(qpass);
+        Serial.println("");
+
+        Serial.println("writing eeprom ssid:");
+        for (int i = 0; i < qsid.length(); ++i)
+        {
+        EEPROM.write(i, qsid[i]);
+        Serial.print("Wrote: ");
+        Serial.println(qsid[i]);
+        }
+        Serial.println("writing eeprom pass:");
+        for (int i = 0; i < qpass.length(); ++i)
+        {
+        EEPROM.write(32 + i, qpass[i]);
+        Serial.print("Wrote: ");
+        Serial.println(qpass[i]);
+        }
+        String flag = "wifiwi";
+        int writecounter = 0;
+        Serial.println("writing wifiwi");
+        for (int i = 500; i < 507; ++i) {
+          EEPROM.write(i, flag[writecounter]);
+          writecounter++;
+        }        
+        EEPROM.commit();
+
+        content = "{\"Success\":\"saved to eeprom... reset to boot into new wifi\"}";
+        statusCode = 200;
+        ESP.reset();
+    } else {
+        content = "{\"Error\":\"404 not found\"}";
+        statusCode = 404;
+        Serial.println("Sending 404");
+    }
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.send(statusCode, "application/json", content);
+}
+
+void handleOff(int pin, String msg) {
+  // switch the relay on
+  digitalWrite(pin, HIGH);
+  content = "<!DOCTYPE HTML>\r\n<html>"+msg;
+  server.send(200, "text/html", content);
+}
+
+void handleOn(int pin, String msg) {
+  // switch the relay on
+  digitalWrite(pin, LOW);
+  content = "<!DOCTYPE HTML>\r\n<html>"+msg;
+  server.send(200, "text/html", content);
+}
+
+void setup() {
+  Serial.begin(115200);
+  EEPROM.begin(EEPROM_SIZE);
+  int counterforepromread = 0;
+  for (int i = 500; i < EEPROM_SIZE_TOCHECK; i++) {
+    eepromData[counterforepromread] = EEPROM.read(i);
+    counterforepromread++;
+  }
+  delay(10);
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(RELAY_PIN_D0, OUTPUT);
+  pinMode(RELAY_PIN_D1, OUTPUT);
+  pinMode(RELAY_PIN_D2, OUTPUT);
+  pinMode(RELAY_PIN_D5, OUTPUT);
+  pinMode(RELAY_PIN_D6, OUTPUT);
+  pinMode(RELAY_PIN_D3, OUTPUT);  
+  pinMode(RELAY_PIN_D8, OUTPUT);
+  pinMode(RELAY_PIN_D7, OUTPUT);
+  pinMode(RELAY_PIN_D4, OUTPUT);
+
+  Serial.println();
+  Serial.println();
+  Serial.println("Eprom data");
+  Serial.println(eepromData);
+  Serial.println("Eprom length");
+  Serial.println(strlen(eepromData));
+  Serial.println("Eprom size to check constant");
+  Serial.println(EEPROM_SIZE_TOCHECK);
+  Serial.println("if (strlen(eepromData) < EEPROM_SIZE_TOCHECK)");
+  Serial.println(strlen(eepromData) < EEPROM_SIZE_TOCHECK);  
+  char strtocheckwifi[] = "wifiwi";
+  char strtocheckap[] = "apapap";
+  // If EEPROM size is less than 6 set, start access point
+    if(strcmp(strtocheckwifi, eepromData) == 0){
+      //Serial.println("OFF");
+      Serial.println("Reading EEPROM ssid");
+      String esid = "";
+      for (int i = 0; i < 32; ++i)
+      {
+          esid += char(EEPROM.read(i));
+      }
+      Serial.println();
+      Serial.print("SSID: ");
+      Serial.println(esid);
+      Serial.println("Reading EEPROM pass");
+
+      String epass = "";
+      for (int i = 32; i < 96; ++i)
+      {
+          epass += char(EEPROM.read(i));
+      }
+      Serial.print("PASS: ");
+      Serial.println(epass);
+      WiFi.begin(esid.c_str(), epass.c_str());
+      Serial.print("Connecting to ");
+      Serial.print(esid.c_str());
+      IPAddress wifiIP(192, 168, 137, 150);
+      IPAddress wifiGateway(192, 168, 137, 1);
+      IPAddress wifiSubnet(255, 255, 255, 0);
+      // Set WiFi mode to station
+      WiFi.mode(WIFI_STA);
+
+      WiFi.config(wifiIP, wifiGateway, wifiSubnet);
+      // Connect to WiFi network
+      WiFi.begin(esid.c_str(), epass.c_str());
+      Serial.print("Connecting to ");
+      Serial.print(esid.c_str());
+      // Wait for connection
+      while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.print("*");
+        if ( counter > EEPROM_RESET_TIMER_NO_WIFI) {
+          String flag = "apapap";
+          int writecounter = 0;
+          Serial.println("writing apapap");
+          for (int i = 500; i < 507; ++i) {
+            EEPROM.write(i, flag[writecounter]);
+            writecounter++;
+          }        
+          EEPROM.commit();        
+          ESP.reset();
+          delay(1000);
+        }
+        counter++;
+      }
+      Serial.print("Connected to WiFi. IP address: ");
+      Serial.println(WiFi.localIP());
+    } else if (strcmp(strtocheckap, eepromData) == 0) {
+      //Serial.println("STA (station)");
+      const char* apSsid = ssid;
+      const char* apPassword = password;
+      IPAddress apIPAp(192, 168, 4, 1);
+      IPAddress apGatewayAp(192, 168, 4, 1);
+      IPAddress apSubnetAp(255, 255, 255, 0);
+
+      // Set WiFi mode to AP
+      WiFi.mode(WIFI_AP);
+
+      // Configure access point settings
+      WiFi.softAPConfig(apIPAp, apGatewayAp, apSubnetAp);
+
+      // Start access point
+      WiFi.softAP(apSsid, apPassword);
+    } else {
+      //Serial.println("unknown");
+      const char* apSsid = ssid;
+      const char* apPassword = password;
+      IPAddress apIP(192, 168, 4, 1);
+      IPAddress apGateway(192, 168, 4, 1);
+      IPAddress apSubnet(255, 255, 255, 0);
+
+      // Set WiFi mode to AP
+      WiFi.mode(WIFI_AP);
+
+      // Configure access point settings
+      WiFi.softAPConfig(apIP, apGateway, apSubnet);
+
+      // Start access point
+      WiFi.softAP(apSsid, apPassword);
+      true;      
+  }
+
+  // Start web server
+  server.on("/", handleRoot);
+  server.on("/restart", handleRestart);
+  server.on("/setting", handleSettings);
+  server.on("/lappyoffbi", [](){
+    handleOff(LED_BUILTIN, "BI off!");
+  });
+  server.on("/lappyonbi", [](){
+    handleOn(LED_BUILTIN, "BI on!");
+  });
+  server.on("/lappyoffd0", [](){
+    handleOff(RELAY_PIN_D0, "D0 charging off!");
+  });
+  server.on("/lappyond0", [](){
+    handleOn(RELAY_PIN_D0, "D0 charging on!");
+  });
+  server.on("/lappyoffd1", [](){
+    handleOff(RELAY_PIN_D1, "D1 charging off!");
+  });
+  server.on("/lappyond1", [](){
+    handleOn(RELAY_PIN_D1, "D1 charging on!");
+  });
+  server.on("/lappyoffd2", [](){
+    handleOff(RELAY_PIN_D2, "D2 charging off!");
+  });
+  server.on("/lappyond2", [](){
+    handleOn(RELAY_PIN_D2, "D2 charging on!");
+  });
+  server.on("/lappyoffd3", [](){
+    handleOff(RELAY_PIN_D3, "D3 charging off!");
+  });
+  server.on("/lappyond3", [](){
+    handleOn(RELAY_PIN_D3, "D3 charging on!");
+  });
+  server.on("/lappyoffd4", [](){
+    handleOff(RELAY_PIN_D4, "D4 charging off!");
+  });
+  server.on("/lappyond4", [](){
+    handleOn(RELAY_PIN_D4, "D4 charging on!");
+  });
+  server.on("/lappyoffd5", [](){
+    handleOff(RELAY_PIN_D5, "D5 charging off!");
+  });
+  server.on("/lappyond5", [](){
+    handleOn(RELAY_PIN_D5, "D5 charging on!");
+  });
+  server.on("/lappyoffd6", [](){
+    handleOff(RELAY_PIN_D6, "D6 charging off!");
+  });
+  server.on("/lappyond6", [](){
+    handleOn(RELAY_PIN_D6, "D6 charging on!");
+  });
+  server.on("/lappyoffd7", [](){
+    handleOff(RELAY_PIN_D7, "D7 charging off!");
+  });
+  server.on("/lappyond7", [](){
+    handleOn(RELAY_PIN_D7, "D7 charging on!");
+  });
+  server.on("/lappyoffd8", [](){
+    handleOff(RELAY_PIN_D8, "D8 charging off!");
+  });
+  server.on("/lappyond8", [](){
+    handleOn(RELAY_PIN_D8, "D8 charging on!");
+  });
+  server.begin();
+}
+
+void loop() {
+  server.handleClient();
+
+  int wifiMode = WiFi.getMode();
+  switch (wifiMode) {
+    case WIFI_OFF:
+      //Serial.println("OFF");
+      true;
+      break;
+    case WIFI_STA:
+      //Serial.println("STA (station)");
+        true;
+      break;
+    case WIFI_AP:
+      //Serial.println("AP (access point)");
+      true;
+      break;
+    case WIFI_AP_STA:
+      //Serial.println("AP+STA (access point + station)");
+      true;
+      break;
+    default:
+      //Serial.println("unknown");
+      true;      
+  }  
+
+  if ( counter > EEPROM_RESET_TIMER) {
+      ESP.reset();
+      delay(1000);
+  }
+  counter++;
+  delay(1000); 
+}
