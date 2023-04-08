@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Charge Guard</title>
+	<style>
+        body {
+			font-family: Arial, sans-serif;
+			background-color: #f2f2f2;
+		}
+		/* Style for the heading */
+		h1 {
+			font-family: Arial, sans-serif;
+			font-size: 36px;
+			font-weight: bold;
+			text-align: center;
+			color: #0A1F44;
+		}
+		
+		/* Style for the subtitle */
+		h2 {
+			font-family: Arial, sans-serif;
+			font-size: 48px;
+			font-weight: normal;
+			text-align: center;
+			color: #800000;
+		}
+        h3 {
+			font-family: Arial, sans-serif;
+			font-size: 24px;
+			font-weight: normal;
+			text-align: center;
+			color: #0B6623;
+		}
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            text-decoration: none;
+            color: #fff;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            border: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+        }
+
+        .button:hover {
+            background-color: #3e8e41;
+            cursor: pointer;
+        }
+        span {
+			background-color: #fff;
+			border-radius: 10px;
+			padding: 20px;
+			box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+			width: 500px;
+			margin: 50px auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 50vh; /* Set height to full viewport height */
+		}
+        .container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            padding: 10px;
+            background-color: #f2f2f2;
+        }
+	</style>
+</head>
+<body>
+    <span>
+        <h1 id="mainhead" class="mainheadcls">Charge Guard</h1>
+        <h2 id="title" class="titlecls"></h2>
+        <h3 id="items" class="itemscls"></h3>
+    </span>
+    <button id="nextButton" class="button">Settings</button>
+    <div class="container">
+        <p id="col"></p>
+        <p id="pol"></p>
+    </div>
+</body>
+<script>
+    const nextButton = document.getElementById("nextButton");
+    nextButton.addEventListener("click", function() {
+        // code to be executed when the button is clicked
+        console.log("Next Button clicked!");
+        window.bridge.sendNextData('next-btn', "NextButton");
+    });
+
+</script>
+<script>
+    var batterylevel = 0;
+    var ischarging = 'Charging';
+    var col = 0;
+    var pol = 0;
+    setInterval(() => {
+        window.bridge.sendSettings((event, settings) => {
+                batterylevel = parseFloat(settings.levelOfBattery) * 100;
+                ischarging = settings.chargingYesOrNO === true?'Charging':'Not Charging';
+                document.getElementById('title').textContent = batterylevel.toFixed(2) + ' %';
+                document.getElementById('items').textContent = ischarging;
+                col = settings&&settings.colpol&&settings.colpol.col?settings.colpol.col:0;
+                pol = settings&&settings.colpol&&settings.colpol.pol?settings.colpol.pol:0;
+                document.getElementById('col').textContent = 'Cut off limit: '+ col + ' %';
+                document.getElementById('pol').textContent = 'Power on limit: '+ pol + ' %';
+        });
+    }, 1000);
+</script>
+</html>
