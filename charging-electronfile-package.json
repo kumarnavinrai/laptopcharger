@@ -1,0 +1,24 @@
+{
+  "name": "charging",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "navin kumar",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^23.2.1"
+  },
+  "dependencies": {
+    "battery-level": "^3.0.0",
+    "electron-cookies": "^1.1.0",
+    "electron-tray-window": "^1.2.7",
+    "fs": "^0.0.1-security",
+    "is-charging": "^2.0.0",
+    "path": "^0.12.7"
+  }
+}
